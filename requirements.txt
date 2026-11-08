@@ -1,0 +1,7 @@
+chromadb
+sentence-transformers
+numpy
+PyMuPDF
+langchain-text-splitters
+google-genai
+python-dotenv
