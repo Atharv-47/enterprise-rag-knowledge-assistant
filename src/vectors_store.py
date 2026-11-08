@@ -1,8 +1,12 @@
 import chromadb
 from sentence_transformers import SentenceTransformer
 import numpy as np
+from sentence_transformers import CrossEncoder
 # Load the embedding model
 model = SentenceTransformer("all-MiniLM-L6-v2")
+
+# Load the Cross-Encoder reranking model
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 # Create a persistent ChromaDB database
 client = chromadb.PersistentClient(
@@ -66,6 +70,31 @@ def mmr_selection(
 
     return selected
 
+def rerank_chunks(question, chunks):
+
+    pairs = [
+        (question, chunk["text"])
+        for chunk in chunks
+    ]
+
+    scores = reranker.predict(pairs)
+
+    ranked_chunks = sorted(
+        zip(chunks, scores),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    reranked_results = []
+
+    for chunk, score in ranked_chunks:
+
+        chunk["relevance_score"] = float(score)
+
+        reranked_results.append(chunk)
+
+    return reranked_results
+
 def store_chunks(chunks, source):
 
     documents = [chunk["text"] for chunk in chunks]
@@ -128,5 +157,8 @@ def search_chunks(question, n_results=5):
             "metadata": results["metadatas"][0][i]
         })
 
-    return retrieved_chunks
+    # Rerank the retrieved chunks using Cross-Encoder
+    reranked_chunks = rerank_chunks(question, retrieved_chunks)
+
+    return reranked_chunks
 

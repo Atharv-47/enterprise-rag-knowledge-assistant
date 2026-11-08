@@ -1,6 +1,6 @@
 from src.vectors_store import search_chunks
 
-question = " Give a summary of Information security, cybersecurity and privacy protection — Information security management systems — Requirements ."
+question = "Who won the FIFA World Cup in 2022? ."
 results = search_chunks(question)
 
 if not results:
