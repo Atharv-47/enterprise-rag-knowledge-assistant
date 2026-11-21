@@ -17,4 +17,5 @@ store_chunks(
     source="sample.pdf"
 )
 from src.vectors_store import collection
+print("Total chunks in ChromaDB:", collection.count())
 

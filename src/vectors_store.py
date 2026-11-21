@@ -95,7 +95,11 @@ def rerank_chunks(question, chunks):
 
     return reranked_results
 
+
 def store_chunks(chunks, source):
+
+    # Remove previously indexed chunks
+    collection.delete(where={"source": source})
 
     documents = [chunk["text"] for chunk in chunks]
 
@@ -107,13 +111,14 @@ def store_chunks(chunks, source):
     ]
 
     metadatas = [
-    {
-        "source": source,
-        "page": chunk["page"],
-        "chunk_index": i
-    }
-    for i, chunk in enumerate(chunks)
-]
+        {
+            "source": source,
+            "page": chunk["page"],
+            "chunk_index": i
+        }
+        for i, chunk in enumerate(chunks)
+    ]
+
     collection.upsert(
         ids=ids,
         documents=documents,
@@ -123,11 +128,14 @@ def store_chunks(chunks, source):
 
     print(f"Successfully stored {len(chunks)} chunks.")
 
-def search_chunks(question, n_results=5):
+
+def search_chunks(question, n_results=8):
+    
+
 
     query_embedding = model.encode(question)
 
-    candidate_k = min(10, collection.count())
+    candidate_k = min(30, collection.count())
 
     if candidate_k == 0:
         return []

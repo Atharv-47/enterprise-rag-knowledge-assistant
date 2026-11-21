@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from google import genai
+from google.genai import errors
 
 load_dotenv()
 
@@ -19,13 +20,18 @@ def generate_answer(question, context):
 
     1. Answer using ONLY the information provided in the context.
     2. Do not use external knowledge or make unsupported assumptions.
-    3. Cite factual statements using the source ID provided in the context.
-    4. Use this exact citation format: [1], [2], etc.
-    5. Use only source IDs that actually appear in the context.
-    6. Place citations immediately after the statements they support.
-    7. If the context does not contain enough information,
-       clearly state that the information is not available.
-    8. Follow the requested answer format and sentence count.
+    3. Before answering, determine whether the context contains
+    sufficient information to answer the question.
+    4. If the context is related to the question but does not
+    contain the required answer, abstain.
+    5. If the answer is unavailable, respond exactly:
+    "I couldn't find sufficient information in the uploaded documents."
+    6. Cite factual statements using the source ID provided in the context.
+    7. Use this exact citation format: [1], [2], etc.
+    8. Use only source IDs that actually appear in the context.
+    9. Place citations immediately after the statements they support.
+    10. Follow the requested answer format and sentence count
+        whenever the answer is available.
 
     Context:
     {context}
@@ -38,9 +44,15 @@ def generate_answer(question, context):
 
 
 
-    response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=prompt
-    )
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.8-flash",
+            contents=prompt
+        )
+        return response.text
 
-    return response.text
+    except errors.ServerError:
+        return "Gemini is temporarily unavailable. Please try again later."
+
+    except errors.APIError as e:
+        return f"Gemini API error: {e}"
