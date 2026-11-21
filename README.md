@@ -1,16 +1,18 @@
 # Enterprise RAG Knowledge Assistant
 
-An AI-powered document question-answering system that uses Retrieval-Augmented Generation (RAG) to retrieve relevant information from PDF documents and generate context-grounded answers with source references.
+An AI-powered document question-answering system that uses **Retrieval-Augmented Generation (RAG)** to retrieve relevant information from PDF documents and generate context-grounded answers with source references.
 
 **Project Status:** In Development
 
 ## Overview
 
-Enterprise RAG Knowledge Assistant is designed to help users query information stored in PDF documents using natural language.
+Enterprise RAG Knowledge Assistant is designed to help users retrieve and understand information from PDF documents through natural-language queries.
 
-Instead of relying entirely on an LLM's internal knowledge, the system retrieves relevant document passages, reranks them based on query relevance, and supplies them as context to a Gemini model.
+Rather than relying solely on an LLM's internal knowledge, the system retrieves relevant document passages using semantic search, applies Maximum Marginal Relevance (MMR) to improve retrieval diversity, and uses a Cross-Encoder to rerank the selected passages.
 
-The system also includes an abstention mechanism to reject questions when the retrieved passages appear insufficiently relevant.
+The retrieved content is then supplied to Google's Gemini model as context for answer generation.
+
+The project also explores relevance-based abstention to reduce unsupported responses when retrieved information is insufficient.
 
 ## Architecture
 
@@ -19,57 +21,64 @@ The system also includes an abstention mechanism to reject questions when the re
                    |
                    v
           PDF Text Extraction
-               (PyMuPDF)
+                (PyMuPDF)
                    |
                    v
              Text Chunking
        (LangChain Text Splitters)
                    |
                    v
-              Embeddings
+          Embedding Generation
         (Sentence Transformers)
                    |
                    v
              ChromaDB
-          Vector Database
+          Persistent Storage
                    |
                    v
-             User Query
+              User Query
                    |
                    v
-             Vector Search
+          Query Embedding
                    |
                    v
-             MMR Selection
+           Vector Retrieval
+          (Top 30 Candidates)
                    |
                    v
-          Cross-Encoder Reranking
+          MMR-based Selection
                    |
                    v
-          Relevance / Abstention
+        Cross-Encoder Reranking
                    |
                    v
-           Retrieved Context
+        Relevance Assessment
                    |
                    v
-          Gemini Answer Generation
+          Context Construction
+          (Source References)
                    |
                    v
-          Answer with Source References
+        Gemini Answer Generation
+                   |
+                   v
+       Grounded Answer with Sources
 ```
 
 ## Implemented Features
 
-- **PDF Text Extraction:** Extracts text from PDF documents using PyMuPDF while preserving page numbers.
-- **Text Chunking:** Splits extracted text into manageable chunks using LangChain's RecursiveCharacterTextSplitter.
+- **PDF Text Extraction:** Extracts text from PDF documents using PyMuPDF while retaining page-level information.
+- **Text Preprocessing:** Normalizes whitespace and removes excessive blank lines before chunking.
+- **Recursive Text Chunking:** Uses LangChain's RecursiveCharacterTextSplitter with configurable chunk size and overlap.
 - **Local Embeddings:** Generates document and query embeddings using Sentence Transformers (`all-MiniLM-L6-v2`).
-- **Vector Database:** Stores document chunks, embeddings, and metadata in persistent ChromaDB storage.
-- **Semantic Retrieval:** Retrieves candidate passages based on query similarity.
-- **Maximum Marginal Relevance (MMR):** Selects diverse passages to reduce redundant retrieval.
-- **Cross-Encoder Reranking:** Reorders retrieved passages using `cross-encoder/ms-marco-MiniLM-L-6-v2`.
-- **Abstention Mechanism:** Rejects questions when the highest reranking score is at or below a provisional threshold of zero.
+- **Persistent Vector Storage:** Stores document chunks, embeddings, and metadata in ChromaDB.
+- **Semantic Retrieval:** Retrieves candidate passages based on vector similarity.
+- **Maximum Marginal Relevance (MMR):** Selects diverse passages from the retrieved candidates to reduce redundancy.
+- **Cross-Encoder Reranking:** Reorders selected passages using `cross-encoder/ms-marco-MiniLM-L-6-v2` based on query-passage relevance.
 - **LLM Integration:** Uses Google's Gemini API to generate answers from retrieved document context.
-- **Source Metadata:** Preserves document filenames and page numbers and generates unique source references.
+- **Context Construction:** Combines retrieved passages and their metadata into a structured context for answer generation.
+- **Source References:** Maintains document filenames and page numbers and generates source identifiers for context citations.
+- **Experimental Abstention:** Evaluates reranking relevance scores to identify questions that may not be sufficiently supported by retrieved passages.
 
 ## Technology Stack
 
@@ -78,12 +87,14 @@ The system also includes an abstention mechanism to reject questions when the re
 | Programming Language | Python |
 | PDF Processing | PyMuPDF |
 | Text Chunking | LangChain Text Splitters |
-| Embeddings | Sentence Transformers |
+| Embedding Model | Sentence Transformers |
+| Embedding Model Name | all-MiniLM-L6-v2 |
 | Vector Database | ChromaDB |
-| Retrieval Optimization | MMR |
+| Retrieval Optimization | Maximum Marginal Relevance (MMR) |
 | Reranking | Cross-Encoder |
+| Reranking Model | ms-marco-MiniLM-L-6-v2 |
 | Answer Generation | Google Gemini API |
-| Environment Variables | python-dotenv |
+| Environment Configuration | python-dotenv |
 
 ## Project Structure
 
@@ -91,39 +102,38 @@ The system also includes an abstention mechanism to reject questions when the re
 enterprise-rag-knowledge-assistant/
 │
 ├── data/
-│   ├── sample_docs/
-│   └── chroma_db/             # Generated locally
+│   ├── sample_docs/             # Sample PDF documents
+│   └── chroma_db/               # Persistent vector storage
 │
 ├── src/
-│   ├── document_loader.py
-│   ├── text_chunker.py
-│   ├── vectors_store.py
-│   └── llm.py
+│   ├── document_loader.py       # PDF text extraction
+│   ├── text_chunker.py          # Text preprocessing and chunking
+│   ├── vectors_store.py         # Embeddings, retrieval, MMR and reranking
+│   └── llm.py                   # Gemini integration
 │
-├── .env                       # API key (not committed)
+├── .env                         # API credentials (not committed)
 ├── .gitignore
 ├── requirements.txt
 ├── README.md
 │
-├── testload.py
-├── test_embeding.py
-├── test_gemni.py
-├── test_vectorsstore.py
-├── test_retrieval.py
-├── test_reranker.py
-└── test_rag.py
+├── test_vectorsstore.py         # Document ingestion and indexing
+├── test_chunking.py             # Chunking tests
+├── test_reranker.py             # Reranking and relevance tests
+├── test_answerability.py        # Answerability experiments
+└── test_rag.py                  # End-to-end RAG pipeline
 ```
 
 ## Installation and Setup
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/Atharv-47/enterprise-rag-knowledge-assistant.git
+
 cd enterprise-rag-knowledge-assistant
 ```
 
-### 2. Create a virtual environment
+### 2. Create a Virtual Environment
 
 ```bash
 python -m venv .venv
@@ -135,7 +145,7 @@ Activate it on Windows PowerShell:
 .venv\Scripts\Activate.ps1
 ```
 
-### 3. Install dependencies
+### 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -149,11 +159,11 @@ Create a `.env` file in the project root:
 GEMINI_API_KEY=your_api_key_here
 ```
 
-Obtain an API key through Google AI Studio.
+Obtain an API key through [Google AI Studio](https://aistudio.google.com/).
 
-**Important:** Never commit your `.env` file or expose your API key publicly.
+**Security:** Never commit the `.env` file or expose API credentials publicly.
 
-### 5. Add a PDF document
+### 5. Add PDF Documents
 
 Place a text-based PDF inside:
 
@@ -163,57 +173,66 @@ data/sample_docs/
 
 Update the PDF path in `test_vectorsstore.py` if necessary.
 
-### 6. Process and store the document
+### 6. Process and Index Documents
 
 ```bash
 python test_vectorsstore.py
 ```
 
-This extracts the document text, creates chunks, generates embeddings, and stores them in ChromaDB.
+This performs the document ingestion workflow:
 
-### 7. Test retrieval
+1. Extracts text from the PDF.
+2. Splits the extracted text into chunks.
+3. Generates embeddings for the chunks.
+4. Stores the chunks, embeddings, and metadata in ChromaDB.
+
+### 7. Test Retrieval
 
 ```bash
 python test_retrieval.py
 ```
 
-### 8. Test reranking and abstention
+### 8. Test Reranking and Relevance
 
 ```bash
 python test_reranker.py
 ```
 
-This test does not require a Gemini API call.
+This evaluates retrieved passages using the Cross-Encoder and tests relevance behaviour without requiring a Gemini API call.
 
-### 9. Run the complete RAG pipeline
+### 9. Run the Complete RAG Pipeline
 
 ```bash
 python test_rag.py
 ```
 
-This retrieves relevant context and sends it to Gemini for answer generation.
+This executes retrieval, reranking, context construction, and Gemini-based answer generation.
+
+**Note:** Gemini answer generation requires a valid API key and available API quota.
 
 ## Current Limitations
 
-- Current PDF processing extracts text; scanned image-based PDFs and OCR are not yet supported.
-- Multiple-document ingestion and document management are still under development.
-- The abstention threshold is experimental and has only been tested on a small set of questions.
-- Sentence-level citation accuracy and generated citation formatting still require verification.
-- Gemini API usage is subject to model and project quotas.
+- PDF processing currently extracts text; scanned PDFs and OCR are not supported.
+- Multiple-document ingestion and document management require further development and testing.
+- Retrieval quality and MMR selection require more comprehensive evaluation.
+- The relevance-based abstention threshold is experimental and requires calibration.
+- Citation formatting is implemented through source references in the prompt, but citation accuracy requires further verification.
+- Gemini API availability and usage depend on model access and project quotas.
 - A user-facing Streamlit interface has not yet been implemented.
 
-## Future Improvements
+## Planned Improvements
 
-1. Multiple PDF ingestion and document management.
-2. Semantic caching to reduce repeated processing and API calls.
-3. Prompt-injection guardrails for untrusted document content.
-4. Streamlit interface for uploading PDFs and asking questions.
-5. More comprehensive retrieval, reranking, abstention, and citation evaluation.
-6. Architecture documentation and final testing.
+1. **Retrieval Optimization:** Improve retrieval quality through systematic evaluation and tuning of chunking, candidate selection, and reranking.
+2. **Prompt Injection Protection:** Introduce safeguards against malicious instructions in user queries and untrusted document content.
+3. **Semantic Caching:** Cache responses for semantically similar queries to reduce repeated LLM calls and improve response latency.
+4. **Error Handling and Logging:** Improve exception handling and introduce structured logging for document processing, retrieval, and API operations.
+5. **Retrieval Evaluation:** Evaluate retrieval performance using metrics such as Precision@K, Recall@K, and Mean Reciprocal Rank (MRR).
+6. **Answer Evaluation:** Assess generated answers for relevance, faithfulness, correctness, and citation accuracy.
+7. **Streamlit Interface:** Build an interactive interface for PDF uploads, natural-language queries, generated answers, and source references.
+8. **Deployment:** Prepare the application for reproducible setup and deployment.
 
 ## Project Goal
 
-The goal is to develop a practical document-grounded question-answering system that combines semantic retrieval, reranking, relevance filtering, and LLM-based response generation.
+The objective is to build a practical, document-grounded question-answering system that combines semantic search, retrieval diversification, neural reranking, and LLM-based generation.
 
----
-
+The project focuses on improving the relevance, reliability, and traceability of generated answers while reducing dependence on unsupported LLM responses.
